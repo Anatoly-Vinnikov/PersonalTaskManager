@@ -1,0 +1,16 @@
+<resources>
+    <string name="app_name">Персональный Менеджер Задач</string>
+    <string name="exit">Нажмите еще раз для выхода</string>
+    <string name="new_task">Новая задача</string>
+    <string name="add">Добавить</string>
+    <string name="cancel">Отмена</string>
+    <string name="sharedTasks">sharedTasks</string>
+    <string name="tasks">tasks</string>
+    <string name="stats">stats</string>
+    <string name="delete">Удалить</string>
+    <string name="welcome">Добро пожаловать в Персональный Менеджер Задач.\nДля добавления задачи воспользуйтесь кнопкой в правом нижнем углу.</string>
+    <string name="sortA">Сортировка по алфавиту(А-Я)</string>
+    <string name="sortZ">Сортировка по алфавиту(Я-А)</string>
+    <string name="sort_done">Готово</string>
+    <string name="search">Поиск</string>
+</resources>

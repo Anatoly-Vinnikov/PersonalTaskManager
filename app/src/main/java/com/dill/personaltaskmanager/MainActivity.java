@@ -9,14 +9,16 @@ import android.support.design.widget.FloatingActionButton;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
-import android.view.View;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
-import android.view.WindowManager;
+import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -26,15 +28,17 @@ import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
 
-    /*listView.smoothScrollToPosition(0);*/
     private SharedPreferences savedTasks;
     private SharedPreferences savedStats;
     private ArrayList<String> tasks = new ArrayList<>();
     private ArrayList<String> checkedTasks = new ArrayList<>();
-    private ArrayAdapter<String> adapter;
+    private ArrayList<String> search = new ArrayList<>();
+    private ArrayAdapter<String> adapter, adapter2;
     private ListView listView;
+    private TextView textView;
     private Context context;
     private static long back_pressed;
+    private boolean searchMode = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -43,7 +47,15 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
 
+        toolbar.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                listView.smoothScrollToPosition(0);
+            }
+        });
+
         context = this;
+        textView = (TextView) findViewById(R.id.textView);
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
@@ -51,25 +63,37 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View view) {
                 AlertDialog.Builder alert = new AlertDialog.Builder(context);
 
-                alert.setTitle(R.string.newTask);
+                alert.setTitle(R.string.new_task);
                 final EditText input = new EditText(context);
                 alert.setView(input);
 
                 alert.setPositiveButton(R.string.add, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
                         String value = input.getText().toString();
-                        tasks.add(0, value);
-                        adapter.notifyDataSetChanged();
+                        if (!value.equals("")) {
+                            tasks.add(0, value);
+                            adapter.notifyDataSetChanged();
+                            setChecked();
+                            textView.setVisibility(View.INVISIBLE);
+                        }
                     }
                 });
 
                 alert.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
+                        InputMethodManager imm = (InputMethodManager)getSystemService(
+                                Context.INPUT_METHOD_SERVICE);
+                        if (imm != null) {
+                            imm.hideSoftInputFromWindow(input.getWindowToken(), 0);
+                        }
                     }
                 });
 
                 alert.show();
-                //getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE);
+                InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+                }
             }
         });
 
@@ -85,24 +109,28 @@ public class MainActivity extends AppCompatActivity {
         for(String r : ret) {
             tasks.add(0, r);
         }
+        if (tasks.size() > 0) {
+            textView.setVisibility(View.INVISIBLE);
+            Collections.sort(tasks);
+        }
         adapter.notifyDataSetChanged();
 
         savedStats = getSharedPreferences(getString(R.string.sharedTasks), Context.MODE_PRIVATE);
         Set<String> retStats = savedStats.getStringSet(getString(R.string.stats), new HashSet<String>());
         for(String r : retStats) {
             checkedTasks.add(0, r);
-            listView.setItemChecked(Integer.parseInt(r), true);
         }
+        setChecked();
 
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View itemClicked, int position, long id) {
                 if (listView.isItemChecked(position)) {
                     listView.setItemChecked(position, true);
-                    checkedTasks.add(String.valueOf(position));
+                    checkedTasks.add(tasks.get(position));
                 } else {
                     listView.setItemChecked(position, false);
-                    checkedTasks.remove(String.valueOf(position));
+                    checkedTasks.remove(tasks.get(position));
                 }
             }
         });
@@ -116,13 +144,40 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void setChecked() {
+        for (int i = 0; i < tasks.size(); i++) {
+            listView.setItemChecked(i, false);
+        }
+        for (int i = 0; i < checkedTasks.size(); i++) {
+            if (!searchMode) {
+                listView.setItemChecked(tasks.indexOf(checkedTasks.get(i)), true);
+            } else {
+                listView.setItemChecked(search.indexOf(checkedTasks.get(i)), true);
+            }
+        }
+    }
+
     @Override
     public void onBackPressed() {
-        if (back_pressed + 2000 > System.currentTimeMillis())
-            super.onBackPressed();
-        else
-            Toast.makeText(this, R.string.exit, Toast.LENGTH_SHORT).show();
-        back_pressed = System.currentTimeMillis();
+        if (searchMode) {
+            try {
+                getSupportActionBar().setTitle(R.string.app_name);
+                getSupportActionBar().setHomeButtonEnabled(false);
+                getSupportActionBar().setDisplayHomeAsUpEnabled(false);
+            } catch (NullPointerException e) {
+                Log.d("", "Action bar is not supported");
+            }
+            searchMode = false;
+            listView.setAdapter(adapter);
+            search.clear();
+            setChecked();
+        } else {
+            if (back_pressed + 2000 > System.currentTimeMillis())
+                super.onBackPressed();
+            else
+                Toast.makeText(this, R.string.exit, Toast.LENGTH_SHORT).show();
+            back_pressed = System.currentTimeMillis();
+        }
     }
 
     @Override
@@ -138,6 +193,10 @@ public class MainActivity extends AppCompatActivity {
                 }
                 tasks.remove(position);
                 adapter.notifyDataSetChanged();
+                setChecked();
+                if (tasks.size() == 0) {
+                    textView.setVisibility(View.VISIBLE);
+                }
             }
         });
         builder.setCancelable(true);
@@ -146,7 +205,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        //getMenuInflater().inflate(R.menu.menu_main, menu);
+        getMenuInflater().inflate(R.menu.menu_main, menu);
         return true;
     }
 
@@ -154,7 +213,70 @@ public class MainActivity extends AppCompatActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
 
-        if (id == R.id.action_settings) {
+        if (id == R.id.action_sortA) {
+            Collections.sort(tasks);
+            adapter.notifyDataSetChanged();
+            setChecked();
+            Toast.makeText(this, R.string.sort_done, Toast.LENGTH_SHORT).show();
+            return true;
+        } else if (id == R.id.action_sortZ) {
+            Collections.sort(tasks);
+            Collections.reverse(tasks);
+            adapter.notifyDataSetChanged();
+            setChecked();
+            Toast.makeText(this, R.string.sort_done, Toast.LENGTH_SHORT).show();
+            return true;
+        } else if (id == R.id.action_search) {
+            searchMode = true;
+            AlertDialog.Builder alert = new AlertDialog.Builder(context);
+
+            alert.setTitle(R.string.search);
+            final EditText input = new EditText(context);
+            alert.setView(input);
+
+            alert.setPositiveButton(R.string.search, new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int whichButton) {
+                    String value = input.getText().toString();
+                    search.clear();
+                    try {
+                        getSupportActionBar().setTitle(R.string.search);
+                        getSupportActionBar().setHomeButtonEnabled(true);
+                        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+                    } catch (NullPointerException e) {
+                        Log.d("", "Action bar is not supported");
+                    }
+                    for (int i = 0; i < tasks.size(); i++) {
+                        if (tasks.get(i).contains(value)) {
+                            search.add(tasks.get(i));
+                        }
+                    }
+
+                    adapter2 = new ArrayAdapter<>(context,
+                            android.R.layout.simple_list_item_checked, search);
+                    listView.setAdapter(adapter2);
+                    setChecked();
+                    Toast.makeText(context, R.string.sort_done, Toast.LENGTH_SHORT).show();
+                }
+            });
+
+            alert.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+                public void onClick(DialogInterface dialog, int whichButton) {
+                    InputMethodManager imm = (InputMethodManager)getSystemService(
+                            Context.INPUT_METHOD_SERVICE);
+                    if (imm != null) {
+                        imm.hideSoftInputFromWindow(input.getWindowToken(), 0);
+                    }
+                }
+            });
+
+            alert.show();
+            InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (imm != null) {
+                imm.toggleSoftInput(InputMethodManager.SHOW_FORCED, 0);
+            }
+            return true;
+        } else if (id == android.R.id.home) {
+            onBackPressed();
             return true;
         }
 
