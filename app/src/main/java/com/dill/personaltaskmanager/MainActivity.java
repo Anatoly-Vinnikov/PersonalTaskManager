@@ -127,10 +127,18 @@ public class MainActivity extends AppCompatActivity {
             public void onItemClick(AdapterView<?> parent, View itemClicked, int position, long id) {
                 if (listView.isItemChecked(position)) {
                     listView.setItemChecked(position, true);
-                    checkedTasks.add(tasks.get(position));
+                    if (searchMode) {
+                        checkedTasks.add(search.get(position));
+                    } else {
+                        checkedTasks.add(tasks.get(position));
+                    }
                 } else {
                     listView.setItemChecked(position, false);
-                    checkedTasks.remove(tasks.get(position));
+                    if (searchMode) {
+                        checkedTasks.remove(search.get(position));
+                    } else {
+                        checkedTasks.remove(tasks.get(position));
+                    }
                 }
             }
         });
